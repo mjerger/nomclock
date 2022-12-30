@@ -14,31 +14,25 @@
 #include <FastLED.h>
 #include <time.h>
 
-
-// WIFI HTTP server
 #include "config.h"
-const String methods[8]{ "ANY", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
 ESP8266WebServer server(80);
 
 // NTP
-
 #define MY_NTP_SERVER "at.pool.ntp.org"
 #define MY_TZ "CET-1CEST,M3.5.0,M1128.0/3"
 time_t now;
 tm tm;
-const String weekdays[7]{ "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 
 // LEDs
-
-#define BRIGHTNESS 32
+#define BRIGHTNESS 128
 #define FPS 30
 #define NUM_LEDS (24+12)
 CRGB leds[NUM_LEDS];
 #define LED_PIN 2
 
 
-void setup(void) {
-
+void setup(void)
+{
   Serial.begin(115200);
 
   delay(300);
@@ -56,15 +50,15 @@ void setup(void) {
   // LEDs
   Serial.println("Have " + String(NUM_LEDS) +" LEDs ");
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(BRIGHTNESS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5,2000);
-  FastLED.show();
+  FastLED.setBrightness(255);
   for (int i=0; i<NUM_LEDS; i++) {
     fill_solid(leds, NUM_LEDS, CRGB::Black);
     leds[i] = ColorFromPalette(RainbowColors_p, (255/NUM_LEDS)*i, 255, LINEARBLEND);
     FastLED.delay(30);
   }
   fill_solid(leds, NUM_LEDS, CRGB::Black);
+  FastLED.setBrightness(BRIGHTNESS);
   FastLED.show();
 
   // Connect to WIFI
@@ -80,14 +74,16 @@ void setup(void) {
   Serial.println(" ok");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-
 }
 
+void blur(CRGB *leds, int num) {
+  for (int i=0; i<num; i++) {
+    leds[(i+1)%num] = blend(leds[(i+1)%num], leds[i], 128);
+  }
+}
 
-void loop(void) {
-
-  //fill_solid(leds, NUM_LEDS, CRGB::Black);
-   
+void loop(void)
+{  
   // NTP time
   time(&now);
   localtime_r(&now, &tm);
@@ -102,17 +98,20 @@ void loop(void) {
   const int msi = ms>=12 ? ms-12 : 12+ms;
   const int hi  = h >=6  ? h -6  :  6+h; 
 
-  leds[msi]          = blend(leds[msi],          CRGB::white, 64);
-  leds[(mi+1)%24]    = blend(leds[(mi+1)%24],    ColorFromPalette(RainbowColors_p, (256/60)*tm.tm_min + 128, 255, LINEARBLEND), 128);
-  leds[mi]           = blend(leds[mi],           ColorFromPalette(RainbowColors_p, (256/60)*tm.tm_min + 128, 255, LINEARBLEND), 128);
-  leds[(si+1)%24]    = blend(leds[(si+1)%24],    ColorFromPalette(RainbowColors_p, (256/60)*tm.tm_sec,       255, LINEARBLEND), 128);
-  leds[si]           = blend(leds[si],           ColorFromPalette(RainbowColors_p, (256/60)*tm.tm_sec,       255, LINEARBLEND), 128);
-  leds[24+(hi+1)%12] = blend(leds[24+(hi+1)%12], ColorFromPalette(RainbowColors_p, (256/24)*tm.tm_hour,      255, LINEARBLEND), 128);
-  leds[24+hi]        = blend(leds[24+hi],        ColorFromPalette(RainbowColors_p, (256/24)*tm.tm_hour,      255, LINEARBLEND), 128);
-
+  // Fade out linearly
+  const int st = 8;
   for (int i=0; i<NUM_LEDS; i++) {
-    leds[i] = blend(leds[i], CRGB::Black, 32); 
+    leds[i].r = leds[i].r > st ? leds[i].r - st : 0;
+    leds[i].g = leds[i].g > st ? leds[i].g - st : 0;
+    leds[i].b = leds[i].b > st ? leds[i].b - st : 0;
   }
+
+  // Set LEDs
+  leds[mi]           = blend(leds[mi],           ColorFromPalette(RainbowColors_p,  ((256/60)*tm.tm_min + 128) % 256, 255, LINEARBLEND), 128);
+  leds[si]           = blend(leds[si],           ColorFromPalette(RainbowColors_p,  ((256/60)*tm.tm_sec+(millis()%500)/4) % 256,  255, LINEARBLEND), 128);
+  leds[24+hi]        = blend(leds[24+hi],        ColorFromPalette(RainbowColors_p,  ((256/24)*tm.tm_hour + 64) % 256,      255, LINEARBLEND), 128);
+  leds[msi]          = blend(leds[msi],          CRGB::White, 32);
+
   // Output
   FastLED.delay(1000/FPS);
   yield();
