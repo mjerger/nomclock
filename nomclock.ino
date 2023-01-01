@@ -91,7 +91,7 @@ void loop(void)
   const double ms = (millis() / (1000/24)) % 24;   // 0..23
   const double s  = (double)tm.tm_sec / 2.5;       // 0..23
   const double m  = (double)tm.tm_min / 2.5;       // 0..23
-  const double h  = 0;//(double)(tm.tm_hour % 12); // 0..12
+  const double h  = (double)(tm.tm_hour % 12); // 0..12
 
   const int mi  = m >=12 ? m -12 : 12+m;
   const int si  = s >=12 ? s -12 : 12+s;
